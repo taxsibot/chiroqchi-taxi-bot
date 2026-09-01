@@ -13,7 +13,7 @@ from config import ADMIN_ID
 from utils.locales import get_trans, TRANSLATIONS
 
 from utils.utils import check_subscription, get_subscription_keyboard, IsMenuButton
-from utils.ocr_helper import extract_plate_number, validate_uzb_plate, normalize_plate, normalize_for_comparison, reader
+from utils.ocr_helper import extract_plate_number, validate_uzb_plate, normalize_plate, normalize_for_comparison, get_reader
 from utils.phone_validation import is_uzbek_number, normalize_phone
 from utils.cache import WARNING_MESSAGES
 import re
@@ -652,7 +652,7 @@ async def process_car_photo(message: types.Message, state: FSMContext):
         file = await message.bot.get_file(photo.file_id)
         photo_stream = await message.bot.download_file(file.file_path)
         photo_data = photo_stream.read()
-        if reader is None:
+        if get_reader() is None:
             await waiting_msg.delete()
             return await message.answer("⚠️ OCR tizimi hozircha ishlamayapti. Iltimos, adminga murojaat qiling.")
 

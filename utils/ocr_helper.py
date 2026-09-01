@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 UZB_PLATE_REGEX = r'([0-9]{2}[A-Z][0-9]{3}[A-Z]{2})|([0-9]{2}[0-9]{3}[A-Z]{3})'
 
 _reader = None
+reader = None  # Compatibility alias
 
 def get_reader():
     global _reader
