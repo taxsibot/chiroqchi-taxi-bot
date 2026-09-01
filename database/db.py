@@ -126,17 +126,6 @@ async def init_db():
                 UNIQUE(user_id, address)
             )
         """)
-        
-        # Create Indexes for performance
-        await db.execute("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)")
-        await db.execute("CREATE INDEX IF NOT EXISTS idx_users_status ON users(status)")
-        await db.execute("CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)")
-        await db.execute("CREATE INDEX IF NOT EXISTS idx_orders_passenger ON orders(passenger_id)")
-        await db.execute("CREATE INDEX IF NOT EXISTS idx_orders_driver ON orders(driver_id)")
-        await db.execute("CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_id)")
-        await db.execute("CREATE INDEX IF NOT EXISTS idx_drivers_online ON drivers(is_online)")
-        await db.execute("CREATE INDEX IF NOT EXISTS idx_drivers_approved ON drivers(is_approved)")
-        
         # Migrations
         try: await db.execute("ALTER TABLE users ADD COLUMN cashback_balance REAL DEFAULT 0.0")
         except Exception as e: logging.debug(f"Migration (cashback_balance) skipped: {e}")

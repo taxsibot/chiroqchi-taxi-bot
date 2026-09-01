@@ -63,17 +63,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 async def main():
-    # Initialize database
-    await init_db()
-    
-    # Session configuration (optimized for aiogram 3.x)
-    session = None
-    if USE_PROXY and PROXY_URL:
-        session = AiohttpSession(proxy=PROXY_URL, timeout=30.0)
-        logging.info(f"Using proxy: {PROXY_URL}")
-    else:
-        session = AiohttpSession(timeout=30.0)
-    
     # ─── Render.com / Cloud Health Check Server (24/7 Uptime) ───────────────────
     import os
     from aiohttp import web
@@ -95,6 +84,17 @@ async def main():
             logging.warning(f"Health server failed to start on port {port}: {e}")
     await _start_health_server()
     # ────────────────────────────────────────────────────────────────────────────
+
+    # Initialize database
+    await init_db()
+    
+    # Session configuration (optimized for aiogram 3.x)
+    session = None
+    if USE_PROXY and PROXY_URL:
+        session = AiohttpSession(proxy=PROXY_URL, timeout=30.0)
+        logging.info(f"Using proxy: {PROXY_URL}")
+    else:
+        session = AiohttpSession(timeout=30.0)
     
     # Initialize bot and dispatcher
     bot = Bot(
