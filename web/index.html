@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Chiroqchi Taxi - Premium</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <div id="map"></div>
+        
+        <div class="bottom-panel">
+            <div class="handle"></div>
+            
+            <div class="header-row">
+                <h2>Taksi Chaqirish</h2>
+                <img src="logo.png" alt="Logo" class="logo-small">
+            </div>
+            
+            <div class="locations">
+                <div class="loc-row">
+                    <span class="dot green"></span>
+                    <input type="text" id="fromLoc" placeholder="Qayerdan (Xaritadan tanlang)" readonly>
+                </div>
+                <div class="loc-line"></div>
+                <div class="loc-row">
+                    <span class="dot red"></span>
+                    <input type="text" id="toLoc" placeholder="Qayerga (Xaritadan tanlang)" readonly>
+                </div>
+            </div>
+
+            <div class="details">
+                <div class="input-group">
+                    <label>💰 Taklif Narxi</label>
+                    <input type="number" id="price" placeholder="Narxni yozing">
+                </div>
+                <div class="input-group">
+                    <label>👥 Yo'lovchi</label>
+                    <select id="passengers">
+                        <option value="1">1 kishi</option>
+                        <option value="2">2 kishi</option>
+                        <option value="3">3 kishi</option>
+                        <option value="4">4 kishi</option>
+                    </select>
+                </div>
+            </div>
+
+            <button id="orderBtn" class="primary-btn" disabled>Buyurtma Berish</button>
+            <div id="statusText" class="status-text">Xaritadan 'Qayerdan' manzilini tanlang</div>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand(); 
+        
+        // Leaflet setup with modern style
+        const map = L.map('map', {
+            zoomControl: false,
+            attributionControl: false
+        }).setView([39.0345, 66.7865], 13);
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19
+        }).addTo(map);
+
+        let fromMarker = null;
+        let toMarker = null;
+        let step = 1; // 1: selecting from, 2: selecting to
+
+        const fromIcon = L.divIcon({className: 'custom-div-icon', html: "<div class='marker-pin green'></div>", iconSize: [30, 42], iconAnchor: [15, 42]});
+        const toIcon = L.divIcon({className: 'custom-div-icon', html: "<div class='marker-pin red'></div>", iconSize: [30, 42], iconAnchor: [15, 42]});
+
+        const statusText = document.getElementById('statusText');
+        const fromInput = document.getElementById('fromLoc');
+        const toInput = document.getElementById('toLoc');
+        const orderBtn = document.getElementById('orderBtn');
+        const priceInput = document.getElementById('price');
+
+        // Geocoding function using Nominatim (free OSM API)
+        async function getAddressName(lat, lng) {
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`);
+                const data = await res.json();
+                if(data && data.display_name) {
+                    let parts = data.display_name.split(',');
+                    return parts[0] + (parts.length > 1 ? ', ' + parts[1] : '');
+                }
+                return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+            } catch(e) {
+                return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+            }
+        }
+
+        map.on('click', async function(e) {
+            if (step === 1) {
+                if(fromMarker) map.removeLayer(fromMarker);
+                fromMarker = L.marker(e.latlng, {icon: fromIcon}).addTo(map);
+                fromInput.value = "Kutmoqda...";
+                let address = await getAddressName(e.latlng.lat, e.latlng.lng);
+                fromInput.value = address;
+                
+                step = 2;
+                statusText.innerText = "Endi xaritadan 'Qayerga' manzilini tanlang";
+            } else if (step === 2) {
+                if(toMarker) map.removeLayer(toMarker);
+                toMarker = L.marker(e.latlng, {icon: toIcon}).addTo(map);
+                toInput.value = "Kutmoqda...";
+                let address = await getAddressName(e.latlng.lat, e.latlng.lng);
+                toInput.value = address;
+
+                // Calculate rough distance for price estimation
+                let dist = fromMarker.getLatLng().distanceTo(toMarker.getLatLng()); // in meters
+                let estPrice = Math.max(5000, Math.round((dist / 1000) * 2000 / 1000) * 1000); // 2000 UZS per KM, min 5000
+                priceInput.value = estPrice;
+
+                statusText.innerText = "Narx va yo'lovchi sonini tasdiqlang";
+                orderBtn.disabled = false;
+                
+                // Fit bounds
+                let group = new L.featureGroup([fromMarker, toMarker]);
+                map.fitBounds(group.getBounds(), {padding: [50, 50]});
+            }
+        });
+
+        fromInput.addEventListener('click', () => {
+            step = 1;
+            statusText.innerText = "Xaritadan 'Qayerdan' manzilini tanlang";
+            fromInput.value = "";
+            if(fromMarker) map.removeLayer(fromMarker);
+            orderBtn.disabled = true;
+        });
+
+        toInput.addEventListener('click', () => {
+            step = 2;
+            statusText.innerText = "Xaritadan 'Qayerga' manzilini tanlang";
+            toInput.value = "";
+            if(toMarker) map.removeLayer(toMarker);
+            orderBtn.disabled = true;
+        });
+
+        orderBtn.addEventListener('click', () => {
+            const price = priceInput.value;
+            const passengers = document.getElementById('passengers').value;
+
+            if (!fromInput.value || !toInput.value || !price) {
+                tg.showAlert("Ma'lumotlar to'liq emas!");
+                return;
+            }
+
+            const data = {
+                action: "order_taxi",
+                from: fromInput.value,
+                to: toInput.value,
+                from_lat: fromMarker.getLatLng().lat,
+                from_lon: fromMarker.getLatLng().lng,
+                to_lat: toMarker.getLatLng().lat,
+                to_lon: toMarker.getLatLng().lng,
+                price: price,
+                passengers: passengers
+            };
+
+            tg.sendData(JSON.stringify(data));
+            tg.close();
+        });
+    </script>
+</body>
+</html>

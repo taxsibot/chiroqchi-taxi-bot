@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Chiroqchi Taksi 2.0</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://api-maps.yandex.ru/2.1/?lang=uz_UZ&apikey=f9f53f0a-3916-46cb-a750-1fafeb243226" type="text/javascript"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: var(--tg-theme-bg-color, #f8fafc);
+            --card-bg: var(--tg-theme-secondary-bg-color, #ffffff);
+            --text-color: var(--tg-theme-text-color, #0f172a);
+            --hint-color: var(--tg-theme-hint-color, #64748b);
+            --primary: var(--tg-theme-button-color, #2563eb);
+            --primary-text: var(--tg-theme-button-text-color, #ffffff);
+            --accent: #f59e0b;
+            --success: #10b981;
+            --danger: #ef4444;
+            --border: rgba(148, 163, 184, 0.2);
+            --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: var(--bg-color); color: var(--text-color); }
+
+        #app { display: flex; flex-direction: column; height: 100vh; position: relative; }
+        #map { width: 100%; height: 50vh; flex-shrink: 0; }
+
+        /* Floating GPS locate button */
+        .gps-btn {
+            position: absolute;
+            right: 16px;
+            top: 16px;
+            z-index: 500;
+            background: var(--card-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border);
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: var(--shadow);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .gps-btn:active { transform: scale(0.9); }
+
+        /* Sheet Drawer */
+        .sheet {
+            flex: 1;
+            background: var(--card-bg);
+            border-top-left-radius: 24px;
+            border-top-right-radius: 24px;
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.12);
+            padding: 18px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            position: relative;
+            z-index: 600;
+            overflow-y: auto;
+            margin-top: -20px;
+        }
+
+        .sheet-handle {
+            width: 40px;
+            height: 4px;
+            background: var(--hint-color);
+            opacity: 0.3;
+            border-radius: 4px;
+            align-self: center;
+            margin-bottom: 2px;
+        }
+
+        .header-title {
+            font-size: 16px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .status-badge {
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: rgba(37, 99, 235, 0.1);
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        /* Route Inputs */
+        .route-box {
+            background: rgba(148, 163, 184, 0.08);
+            border-radius: 16px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .input-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .input-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .dot-from { background: var(--primary); }
+        .dot-to { background: var(--danger); }
+
+        .route-input {
+            width: 100%;
+            border: none;
+            background: transparent;
+            color: var(--text-color);
+            font-size: 14px;
+            font-weight: 600;
+            outline: none;
+            cursor: pointer;
+        }
+        .route-input::placeholder { color: var(--hint-color); font-weight: 400; }
+
+        .divider {
+            height: 1px;
+            background: var(--border);
+            margin-left: 20px;
+        }
+
+        /* Tariff Selector */
+        .tariffs {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+
+        .tariff-card {
+            background: rgba(148, 163, 184, 0.08);
+            border: 2px solid transparent;
+            border-radius: 14px;
+            padding: 10px 6px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .tariff-card.active {
+            border-color: var(--primary);
+            background: rgba(37, 99, 235, 0.08);
+        }
+
+        .tariff-icon { font-size: 22px; margin-bottom: 2px; }
+        .tariff-name { font-size: 12px; font-weight: 700; }
+        .tariff-desc { font-size: 10px; color: var(--hint-color); }
+
+        /* Options Row (Passengers & Custom Price) */
+        .options-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .price-box {
+            flex: 1;
+            background: rgba(148, 163, 184, 0.08);
+            border-radius: 14px;
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid var(--border);
+        }
+
+        .price-val {
+            font-size: 16px;
+            font-weight: 800;
+            color: var(--primary);
+        }
+
+        .pax-selector {
+            display: flex;
+            background: rgba(148, 163, 184, 0.08);
+            border-radius: 14px;
+            padding: 4px;
+            gap: 4px;
+            border: 1px solid var(--border);
+        }
+
+        .pax-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
+            border: none;
+            background: transparent;
+            color: var(--text-color);
+            font-weight: 700;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .pax-btn.active {
+            background: var(--primary);
+            color: var(--primary-text);
+        }
+
+        /* Order Button */
+        .submit-btn {
+            width: 100%;
+            padding: 16px;
+            border-radius: 16px;
+            border: none;
+            background: var(--primary);
+            color: var(--primary-text);
+            font-size: 16px;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: transform 0.1s;
+        }
+        .submit-btn:active { transform: scale(0.98); }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div id="map"></div>
+        <button class="gps-btn" onclick="locateUser()" title="GPS Joylashuv">🎯</button>
+
+        <div class="sheet">
+            <div class="sheet-handle"></div>
+            
+            <div class="header-title">
+                <span id="titleStatus">📍 Qayerdan olib ketamiz?</span>
+                <span class="status-badge" id="stepBadge">QADAM 1/2</span>
+            </div>
+
+            <!-- Route Inputs -->
+            <div class="route-box">
+                <div class="input-row" onclick="setStep('from')">
+                    <div class="input-dot dot-from"></div>
+                    <input type="text" id="fromInput" class="route-input" placeholder="Xaritadan boshlang'ich nuqtani bosing..." readonly>
+                </div>
+                <div class="divider"></div>
+                <div class="input-row" onclick="setStep('to')">
+                    <div class="input-dot dot-to"></div>
+                    <input type="text" id="toInput" class="route-input" placeholder="Borish manzilini tanlang..." readonly>
+                </div>
+            </div>
+
+            <!-- Tariffs -->
+            <div class="tariffs">
+                <div class="tariff-card active" onclick="selectTariff('Standard', this)">
+                    <div class="tariff-icon">🚙</div>
+                    <div class="tariff-name">Standart</div>
+                    <div class="tariff-desc">Hamyonbop</div>
+                </div>
+                <div class="tariff-card" onclick="selectTariff('Comfort', this)">
+                    <div class="tariff-icon">✨</div>
+                    <div class="tariff-name">Komfort</div>
+                    <div class="tariff-desc">Konditsioner</div>
+                </div>
+                <div class="tariff-card" onclick="selectTariff('parcel', this)">
+                    <div class="tariff-icon">📦</div>
+                    <div class="tariff-name">Pochta</div>
+                    <div class="tariff-desc">Tezkor yetkazish</div>
+                </div>
+            </div>
+
+            <!-- Options (Passengers & Price) -->
+            <div class="options-row">
+                <div class="price-box">
+                    <span style="font-size: 11px; color: var(--hint-color);">Taxminiy narx:</span>
+                    <span class="price-val" id="priceDisplay">0 so'm</span>
+                </div>
+                <div class="pax-selector" id="paxBox">
+                    <button class="pax-btn active" onclick="setPax(1, this)">1</button>
+                    <button class="pax-btn" onclick="setPax(2, this)">2</button>
+                    <button class="pax-btn" onclick="setPax(3, this)">3</button>
+                    <button class="pax-btn" onclick="setPax(4, this)">4</button>
+                </div>
+            </div>
+
+            <button class="submit-btn" onclick="submitOrder()">
+                <span>🚕 Taksi Chaqirish</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.expand();
+            tg.enableClosingConfirmation();
+        }
+
+        let myMap = null;
+        let placemarkFrom = null;
+        let placemarkTo = null;
+        let currentStep = 'from';
+        let selectedTariff = 'Standard';
+        let passengerCount = 1;
+        let estimatedPrice = 0;
+
+        let fromCoords = null;
+        let toCoords = null;
+        let fromAddress = "";
+        let toAddress = "";
+
+        ymaps.ready(init);
+
+        function init() {
+            myMap = new ymaps.Map("map", {
+                center: [38.8611, 65.7986], // Chiroqchi markazi
+                zoom: 13,
+                controls: ['zoomControl']
+            });
+
+            myMap.events.add('click', function (e) {
+                let coords = e.get('coords');
+                handleMapClick(coords);
+            });
+
+            // Try auto GPS at start
+            locateUser(false);
+        }
+
+        function setStep(step) {
+            currentStep = step;
+            updateStepUI();
+        }
+
+        function updateStepUI() {
+            let title = document.getElementById('titleStatus');
+            let badge = document.getElementById('stepBadge');
+
+            if (currentStep === 'from') {
+                title.innerText = "📍 Qayerdan olib ketamiz?";
+                badge.innerText = "QADAM 1/2";
+            } else {
+                title.innerText = "🏁 Qayerga borasiz?";
+                badge.innerText = "QADAM 2/2";
+            }
+        }
+
+        function handleMapClick(coords) {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+
+            ymaps.geocode(coords).then(function (res) {
+                let obj = res.geoObjects.get(0);
+                let address = obj ? obj.getAddressLine() : coords[0].toFixed(5) + ", " + coords[1].toFixed(5);
+
+                if (currentStep === 'from') {
+                    fromCoords = coords;
+                    fromAddress = address;
+                    document.getElementById('fromInput').value = address;
+
+                    if (placemarkFrom) myMap.geoObjects.remove(placemarkFrom);
+                    placemarkFrom = new ymaps.Placemark(coords, { iconCaption: 'A: Boshlanish' }, { preset: 'islands#blueDotIconWithCaption' });
+                    myMap.geoObjects.add(placemarkFrom);
+
+                    setStep('to');
+                } else {
+                    toCoords = coords;
+                    toAddress = address;
+                    document.getElementById('toInput').value = address;
+
+                    if (placemarkTo) myMap.geoObjects.remove(placemarkTo);
+                    placemarkTo = new ymaps.Placemark(coords, { iconCaption: 'B: Manzil' }, { preset: 'islands#redDotIconWithCaption' });
+                    myMap.geoObjects.add(placemarkTo);
+
+                    calculatePrice();
+                }
+            });
+        }
+
+        function locateUser(animate = true) {
+            if (!navigator.geolocation) return;
+            navigator.geolocation.getCurrentPosition(function (pos) {
+                let coords = [pos.coords.latitude, pos.coords.longitude];
+                if (animate && myMap) {
+                    myMap.setCenter(coords, 15, { duration: 500 });
+                }
+                handleMapClick(coords);
+            }, function() {});
+        }
+
+        function selectTariff(tariff, el) {
+            if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged();
+            selectedTariff = tariff;
+            document.querySelectorAll('.tariff-card').forEach(c => c.classList.remove('active'));
+            el.classList.add('active');
+
+            let paxBox = document.getElementById('paxBox');
+            if (tariff === 'parcel') {
+                paxBox.style.opacity = '0.3';
+                paxBox.style.pointerEvents = 'none';
+            } else {
+                paxBox.style.opacity = '1';
+                paxBox.style.pointerEvents = 'auto';
+            }
+
+            calculatePrice();
+        }
+
+        function setPax(count, el) {
+            if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged();
+            passengerCount = count;
+            document.querySelectorAll('.pax-btn').forEach(b => b.classList.remove('active'));
+            el.classList.add('active');
+        }
+
+        function calculatePrice() {
+            if (!fromCoords || !toCoords) {
+                estimatedPrice = selectedTariff === 'Comfort' ? 15000 : 10000;
+            } else {
+                // Approximate distance using coordinates
+                let dLat = toCoords[0] - fromCoords[0];
+                let dLon = toCoords[1] - fromCoords[1];
+                let dist = Math.sqrt(dLat*dLat + dLon*dLon) * 111; // km
+                
+                let base = 7000;
+                let perKm = 2500;
+                
+                if (dist > 50) {
+                    // Intercity route (e.g. Tashkent)
+                    estimatedPrice = 120000;
+                } else {
+                    estimatedPrice = Math.max(10000, Math.round((base + dist * perKm) / 1000) * 1000);
+                }
+                
+                if (selectedTariff === 'Comfort') estimatedPrice = Math.round((estimatedPrice * 1.3) / 1000) * 1000;
+                if (selectedTariff === 'parcel') estimatedPrice = Math.round((estimatedPrice * 0.85) / 1000) * 1000;
+            }
+
+            document.getElementById('priceDisplay').innerText = estimatedPrice.toLocaleString('uz-UZ') + " so'm";
+        }
+
+        function submitOrder() {
+            if (!fromAddress || !toAddress) {
+                if (tg?.showAlert) {
+                    tg.showAlert("Iltimos, xaritadan har ikkala manzilni ham tanlang!");
+                } else {
+                    alert("Iltimos, xaritadan har ikkala manzilni tanlang!");
+                }
+                return;
+            }
+
+            if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+
+            let orderPayload = {
+                action: "webapp_order",
+                from_loc: fromAddress,
+                to_loc: toAddress,
+                tariff: selectedTariff,
+                price: estimatedPrice,
+                passengers: passengerCount,
+                from_lat: fromCoords ? fromCoords[0] : null,
+                from_lon: fromCoords ? fromCoords[1] : null,
+                to_lat: toCoords ? toCoords[0] : null,
+                to_lon: toCoords ? toCoords[1] : null
+            };
+
+            if (tg?.sendData) {
+                tg.sendData(JSON.stringify(orderPayload));
+            } else {
+                alert("Buyurtma yuborildi: " + JSON.stringify(orderPayload));
+            }
+        }
+    </script>
+</body>
+</html>

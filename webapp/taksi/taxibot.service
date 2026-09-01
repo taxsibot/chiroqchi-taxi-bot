@@ -1,0 +1,23 @@
+[Unit]
+Description=Chiroqchi Taxi Telegram Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/taxibot
+ExecStart=/home/ubuntu/taxibot/venv/bin/python bot.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=taxibot
+
+# Environment
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=/home/ubuntu/taxibot/.env
+
+[Install]
+WantedBy=multi-user.target
