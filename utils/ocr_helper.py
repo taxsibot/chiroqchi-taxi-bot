@@ -11,14 +11,20 @@ logger = logging.getLogger(__name__)
 # 2: 01001AAA (Legal)
 UZB_PLATE_REGEX = r'([0-9]{2}[A-Z][0-9]{3}[A-Z]{2})|([0-9]{2}[0-9]{3}[A-Z]{3})'
 
-try:
-    import easyocr
-    # Initialize the EasyOCR reader (this will download models on first run)
-    reader = easyocr.Reader(['en'], gpu=False)
-except (ImportError, OSError) as e:
-    logger.warning("easyocr or torch could not be loaded. OCR features will be disabled. Error loading DLL.")
-    easyocr = None
-    reader = None
+_reader = None
+
+def get_reader():
+    global _reader
+    if _reader is None:
+        try:
+            import easyocr
+            logger.info("Initializing EasyOCR reader in background...")
+            _reader = easyocr.Reader(['en'], gpu=False)
+            logger.info("EasyOCR reader initialized successfully.")
+        except Exception as e:
+            logger.warning(f"EasyOCR could not be loaded: {e}")
+            _reader = False
+    return _reader if _reader is not False else None
 
 def normalize_plate(text: str) -> str:
     """Removes all non-alphanumeric characters and converts to uppercase."""
@@ -36,6 +42,7 @@ async def extract_plate_number(photo_bytes: bytes, entered_plate: str = None) ->
     If entered_plate is provided, checks if it exists in the image.
     Returns the normalized plate string or None.
     """
+    reader = get_reader()
     if reader is None:
         return None
     try:
@@ -100,6 +107,7 @@ async def extract_receipt_amount(photo_bytes: bytes) -> int:
     Tries to find the payment amount in a receipt photo (Click, Payme, Uzum, Apelsin).
     Looks for patterns like 'Summa', 'To'landi', 'Muvaffaqiyatli', 'UZS', etc.
     """
+    reader = get_reader()
     if reader is None:
         return None
     try:

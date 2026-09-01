@@ -93,8 +93,7 @@ async def main():
             logging.info(f"✅ Health Check Web Server started on port {port}")
         except Exception as e:
             logging.warning(f"Health server failed to start on port {port}: {e}")
-            
-    asyncio.create_task(_start_health_server())
+    await _start_health_server()
     # ────────────────────────────────────────────────────────────────────────────
     
     # Initialize bot and dispatcher
