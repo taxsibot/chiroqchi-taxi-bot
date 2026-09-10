@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: chiroqchi-taxi-bot
+    env: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: ADMIN_ID
+        sync: false
+      - key: DB_PATH
+        value: bot.db
+      - key: COMMISSION_RATE
+        value: 10
+      - key: MIN_DRIVER_BALANCE
+        value: 20000

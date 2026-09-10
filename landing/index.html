@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chiroqchi Taxi - Premium Transport Xizmati</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="logo">
+                <img src="logo.png" alt="Chiroqchi Taxi Logo">
+                <span>Chiroqchi Taxi</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="#home">Asosiy</a></li>
+                <li><a href="#services">Xizmatlar</a></li>
+                <li><a href="#about">Biz haqimizda</a></li>
+                <li><a href="https://t.me/chiroqchitaksibot" class="btn-nav">Botni ochish</a></li>
+            </ul>
+            <div class="menu-toggle">
+                <i class="fas fa-bars"></i>
+            </div>
+        </div>
+    </nav>
+
+    <section id="home" class="hero">
+        <div class="hero-overlay"></div>
+        <div class="container">
+            <div class="hero-content">
+                <h1 class="reveal">Sizning ishonchli <span class="highlight">yo'ldoshingiz</span></h1>
+                <p class="reveal delay-1">Chiroqchi bo'ylab va shaharlararo eng tezkor va hamyonbop taksi xizmati. Biz bilan manzilingiz har doim yaqin!</p>
+                <div class="hero-btns reveal delay-2">
+                    <a href="https://t.me/chiroqchitaksibot" class="btn-primary">Hozir chaqirish <i class="fab fa-telegram-plane"></i></a>
+                    <a href="#services" class="btn-secondary">Xizmatlarimiz</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="services" class="services">
+        <div class="container">
+            <div class="section-title">
+                <h2>Bizning <span class="highlight">Xizmatlar</span></h2>
+                <p>Har qanday vaziyat uchun sifatli transport yechimlari</p>
+            </div>
+            <div class="services-grid">
+                <div class="service-card">
+                    <div class="icon-box"><i class="fas fa-taxi"></i></div>
+                    <h3>Taksi xizmati</h3>
+                    <p>Shahar ichida va tashqarisida 24/7 tezkor taksi chaqirish imkoniyati.</p>
+                </div>
+                <div class="service-card active">
+                    <div class="icon-box"><i class="fas fa-box"></i></div>
+                    <h3>Pochta va Kargo</h3>
+                    <p>Pochta va yuklaringizni xavfsiz va tezkor yetkazib berish xizmati.</p>
+                </div>
+                <div class="service-card">
+                    <div class="icon-box"><i class="fas fa-calendar-check"></i></div>
+                    <h3>Oldindan band qilish</h3>
+                    <p>Sayohatlaringizni oldindan rejalashtiring va vaqtingizni tejang.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="features" class="features">
+        <div class="container">
+            <div class="features-wrapper">
+                <div class="features-img">
+                    <img src="hero.png" alt="Taxi Feature">
+                </div>
+                <div class="features-content">
+                    <h2>Nima uchun <span class="highlight">bizni</span> tanlashadi?</h2>
+                    <div class="feature-item">
+                        <i class="fas fa-bolt"></i>
+                        <div>
+                            <h4>Tezkor yetib borish</h4>
+                            <p>O'rtacha 5-7 daqiqa ichida haydovchi sizning manzilingizda bo'ladi.</p>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-shield-alt"></i>
+                        <div>
+                            <h4>Xavfsizlik kafolati</h4>
+                            <p>Barcha haydovchilarimiz tajribali va avtomobillar texnik ko'rikdan o'tgan.</p>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-hand-holding-dollar"></i>
+                        <div>
+                            <h4>Hamyonbop narxlar</h4>
+                            <p>Narxlarni o'zingiz belgilang yoki taklif etilgan eng maqbul narxni tanlang.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-top">
+                <div class="footer-logo">
+                    <img src="logo.png" alt="Logo">
+                    <h3>Chiroqchi Taxi</h3>
+                </div>
+                <div class="social-links">
+                    <a href="#"><i class="fab fa-instagram"></i></a>
+                    <a href="#"><i class="fab fa-telegram"></i></a>
+                    <a href="#"><i class="fab fa-facebook"></i></a>
+                </div>
+            </div>
+            <hr>
+            <p class="copyright">&copy; 2026 Chiroqchi Taxi. Barcha huquqlar himoyalangan.</p>
+        </div>
+    </footer>
+
+    <script>
+        // Simple Scroll Reveal
+        window.addEventListener('scroll', () => {
+            const reveals = document.querySelectorAll('.reveal');
+            reveals.forEach(reveal => {
+                const windowHeight = window.innerHeight;
+                const revealTop = reveal.getBoundingClientRect().top;
+                const revealPoint = 150;
+                if (revealTop < windowHeight - revealPoint) {
+                    reveal.classList.add('active');
+                }
+            });
+        });
+
+        // Mobile Menu
+        const menuToggle = document.querySelector('.menu-toggle');
+        const navLinks = document.querySelector('.nav-links');
+        menuToggle.addEventListener('click', () => {
+            navLinks.classList.toggle('active');
+        });
+    </script>
+</body>
+</html>
