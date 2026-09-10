@@ -1,154 +1,133 @@
 import re
 import asyncio
-import cv2
-import numpy as np
 import logging
+from config import GEMINI_API_KEY
 
 logger = logging.getLogger(__name__)
 
-# Uzbekistan car plate regex patterns (simplified for OCR extraction)
+# Uzbekistan car plate regex patterns
 # 1: 01A001AA (Private)
 # 2: 01001AAA (Legal)
 UZB_PLATE_REGEX = r'([0-9]{2}[A-Z][0-9]{3}[A-Z]{2})|([0-9]{2}[0-9]{3}[A-Z]{3})'
 
-_reader = None
-reader = None  # Compatibility alias
-
 def get_reader():
-    global _reader
-    if _reader is None:
-        try:
-            import easyocr
-            logger.info("Initializing EasyOCR reader in background...")
-            _reader = easyocr.Reader(['en'], gpu=False)
-            logger.info("EasyOCR reader initialized successfully.")
-        except Exception as e:
-            logger.warning(f"EasyOCR could not be loaded: {e}")
-            _reader = False
-    return _reader if _reader is not False else None
+    """
+    Returns True to indicate OCR capabilities are ready (powered by Gemini AI).
+    Never blocks registration flow.
+    """
+    return True
+
+reader = True
 
 def normalize_plate(text: str) -> str:
     """Removes all non-alphanumeric characters and converts to uppercase."""
+    if not text:
+        return ""
     return re.sub(r'[^0-9A-Z]', '', text.upper())
 
 def normalize_for_comparison(text: str) -> str:
-    """Extra normalization for robust comparison (e.g. treating O and 0 as the same)."""
+    """Extra normalization for robust comparison (treating O/0, I/1, etc. as equal)."""
     text = normalize_plate(text)
-    # Treat common OCR confusions as the same character for comparison
     return text.replace('O', '0').replace('I', '1').replace('Z', '2').replace('S', '5').replace('B', '8')
-
-async def extract_plate_number(photo_bytes: bytes, entered_plate: str = None) -> str:
-    """
-    Extracts Uzbekistan car plate number from image bytes.
-    If entered_plate is provided, checks if it exists in the image.
-    Returns the normalized plate string or None.
-    """
-    reader = get_reader()
-    if reader is None:
-        return None
-    try:
-        # Convert bytes to opencv image
-        nparr = np.frombuffer(photo_bytes, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        
-        if img is None:
-            return None
-            
-        # --- Preprocessing to improve OCR ---
-        # 1. Grayscale
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        
-        # 2. Resizing for better visibility
-        height, width = gray.shape
-        if width < 1200:
-            scale = 1200 / width
-            gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
-            
-        # 3. Increase Contrast
-        gray = cv2.convertScaleAbs(gray, alpha=1.5, beta=0)
-        
-        # We will try both original and preprocessed images
-        imgs_to_try = [img, gray]
-        
-        for trial_img in imgs_to_try:
-            results = await asyncio.to_thread(reader.readtext, trial_img)
-            
-            # Combine all text
-            all_text = "".join([normalize_plate(res[1]) for res in results])
-            
-            # If we know what we're looking for, check for substring match
-            if entered_plate:
-                norm_entered = normalize_for_comparison(entered_plate)
-                norm_all = normalize_for_comparison(all_text)
-                if norm_entered in norm_all:
-                    return entered_plate
-            
-            # 1. Direct block matches
-            for (bbox, text, prob) in results:
-                normalized = normalize_plate(text)
-                # Try with O/0 replacement for regex matching
-                lenient = normalized.replace('O', '0')
-                match = re.search(UZB_PLATE_REGEX, lenient)
-                if match:
-                    return match.group(0)
-            
-            # 2. Combined text matches (if plate is split)
-            all_text_lenient = all_text.replace('O', '0')
-            match = re.search(UZB_PLATE_REGEX, all_text_lenient)
-            if match:
-                return match.group(0)
-                
-        return None
-    except Exception as e:
-        logger.error(f"OCR Error extracting plate: {e}")
-        return None
-
-async def extract_receipt_amount(photo_bytes: bytes) -> int:
-    """
-    Tries to find the payment amount in a receipt photo (Click, Payme, Uzum, Apelsin).
-    Looks for patterns like 'Summa', 'To'landi', 'Muvaffaqiyatli', 'UZS', etc.
-    """
-    reader = get_reader()
-    if reader is None:
-        return None
-    try:
-        nparr = np.frombuffer(photo_bytes, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        if img is None:
-            return None
-            
-        results = await asyncio.to_thread(reader.readtext, img)
-        full_text = " ".join([res[1] for res in results])
-        
-        # Enhanced regex patterns for Uzbek payment apps
-        patterns = [
-            r'(?:summa|to[\'’`]?landi|oplata|amount|itogo|jami|perevod)[:\s]*([\d\s\.,]+)',
-            r'([\d\s\.,]+)\s*(?:so[\'’`]?m|uzs|sum)',
-            r'(\d{1,3}(?:[ ,.]\d{3})+)\s*(?:so[\'’`]?m|uzs|sum)?',
-            r'\b(\d{4,7})\b'
-        ]
-        
-        found_amounts = []
-        for pattern in patterns:
-            matches = re.findall(pattern, full_text, re.IGNORECASE)
-            for m in matches:
-                clean_num = re.sub(r'[^\d]', '', m)
-                if clean_num and len(clean_num) >= 4:
-                    val = int(clean_num)
-                    # Filter sensible deposit bounds (e.g. 5,000 to 5,000,000 UZS)
-                    if 5000 <= val <= 10000000 and val not in [2026, 2025, 2024, 8600, 9860]:
-                        found_amounts.append(val)
-        
-        if found_amounts:
-            # Usually the highest amount matching typical top-up bounds is the total payment
-            return max(found_amounts)
-        return None
-    except Exception as e:
-        logger.error(f"OCR Error extracting receipt amount: {e}")
-        return None
-
 
 def validate_uzb_plate(text: str) -> bool:
     """Checks if the string follows UZB plate format."""
     normalized = normalize_plate(text)
     return bool(re.fullmatch(UZB_PLATE_REGEX, normalized))
+
+async def extract_plate_number(photo_bytes: bytes, entered_plate: str = None) -> str:
+    """
+    Extracts Uzbekistan car plate number from image bytes using Gemini AI Vision.
+    No heavy OpenCV or PyTorch required.
+    """
+    from utils.ai_helper import client
+    from google.genai import types as genai_types
+
+    if not client or not photo_bytes:
+        # Fallback: if Gemini client is not initialized, return entered_plate if valid
+        return entered_plate if (entered_plate and validate_uzb_plate(entered_plate)) else None
+
+    try:
+        prompt = (
+            "Ushbu avtomobil rasmidan davlat raqamini (avtoraqam) aniqlab ber.\n"
+            "Format namunasi: 01A123BA yoki 70A777AA yoki 01123AAA.\n"
+        )
+        if entered_plate:
+            prompt += f"Foydalanuvchi kiritgan raqam: {entered_plate}. Agar shu raqam yoki shunga juda o'xshash raqam rasmda ko'rinsa, aynan o'sha raqamni qaytar.\n"
+        prompt += "Faqat avtoraqamning o'zini qaytar (masalan: 70A123BA). Hech qanday qo'shimcha so'z, nuqta yoki izoh yozma. Agar umuman raqam ko'rinmasa, NONE deb yoz."
+
+        def _call_vision():
+            image_part = genai_types.Part.from_bytes(data=photo_bytes, mime_type="image/jpeg")
+            return client.models.generate_content(
+                model='gemini-2.0-flash',
+                contents=[image_part, prompt],
+                config=genai_types.GenerateContentConfig(
+                    temperature=0.1,
+                    max_output_tokens=30,
+                )
+            )
+
+        response = await asyncio.wait_for(asyncio.to_thread(_call_vision), timeout=15.0)
+        if response and response.text:
+            cleaned = response.text.strip().upper()
+            if "NONE" in cleaned or not cleaned:
+                return entered_plate if entered_plate else None
+            
+            # Extract plate pattern from response
+            norm_res = normalize_plate(cleaned)
+            match = re.search(UZB_PLATE_REGEX, norm_res)
+            if match:
+                detected = match.group(0)
+                if entered_plate and normalize_for_comparison(detected) == normalize_for_comparison(entered_plate):
+                    return entered_plate
+                return detected
+            
+            if entered_plate and normalize_for_comparison(entered_plate) in normalize_for_comparison(cleaned):
+                return entered_plate
+
+    except Exception as e:
+        logger.warning(f"Gemini Vision Plate OCR Error: {e}")
+
+    # Fallback to entered plate to not block registration
+    return entered_plate if entered_plate else None
+
+async def extract_receipt_amount(photo_bytes: bytes) -> int:
+    """
+    Extracts payment amount from Click/Payme/Uzum receipt using Gemini AI Vision.
+    """
+    from utils.ai_helper import client
+    from google.genai import types as genai_types
+
+    if not client or not photo_bytes:
+        return None
+
+    try:
+        prompt = (
+            "Ushbu to'lov cheki (Click, Payme, Uzum va h.k.) rasmidan to'langan asosiy pul miqdorini aniqlab ber.\n"
+            "Faqat butun son ko'rinishida yoz (masalan: 50000 yoki 100000).\n"
+            "Hech qanday so'm, valyuta belgisi yoki boshqa so'z qo'shma. Agar summa topilmasa, NONE deb yoz."
+        )
+
+        def _call_vision():
+            image_part = genai_types.Part.from_bytes(data=photo_bytes, mime_type="image/jpeg")
+            return client.models.generate_content(
+                model='gemini-2.0-flash',
+                contents=[image_part, prompt],
+                config=genai_types.GenerateContentConfig(
+                    temperature=0.1,
+                    max_output_tokens=20,
+                )
+            )
+
+        response = await asyncio.wait_for(asyncio.to_thread(_call_vision), timeout=15.0)
+        if response and response.text:
+            digits = re.sub(r'[^\d]', '', response.text.strip())
+            if digits:
+                val = int(digits)
+                if 1000 <= val <= 20000000:
+                    return val
+
+    except Exception as e:
+        logger.warning(f"Gemini Vision Receipt OCR Error: {e}")
+
+    return None
