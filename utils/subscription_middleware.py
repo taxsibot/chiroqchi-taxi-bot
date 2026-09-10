@@ -59,19 +59,18 @@ class MandatorySubscriptionMiddleware(BaseMiddleware):
         if isinstance(event, CallbackQuery) and text == "check_sub_again":
             return await handler(event, data)
 
-        # For callback queries: use a longer TTL cache to avoid API spam on every button press
+        # For callback queries: use cache to avoid API spam on every button press
         if is_callback:
             now = time.time()
             cached = SUB_CACHE.get(user_id)
             if cached and isinstance(cached, tuple) and len(cached) >= 2:
                 ts, is_sub = cached[0], cached[1]
-                if (now - ts) < CALLBACK_CACHE_DURATION:
+                ttl = CALLBACK_CACHE_DURATION if is_sub else 10
+                if (now - ts) < ttl:
                     # If they were subscribed (or sub check disabled), allow through
                     if is_sub:
                         return await handler(event, data)
-                    # If they were NOT subscribed, only re-check after message TTL
-                    # (they should re-verify via message, not every button press)
-                    # For callbacks, just show the alert and don't re-check API
+                    # If they were NOT subscribed, show alert
                     await event.answer(
                         "⚠️ Iltimos, avval kanallarga obuna bo'ling!", show_alert=True
                     )

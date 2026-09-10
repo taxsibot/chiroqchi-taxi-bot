@@ -29,11 +29,11 @@ async def scheduled_orders_checker(bot: Bot):
                 scheduled_str = order[7] # 'DD.MM.YYYY HH:MM'
                 status = order[11]
                 
-                if not scheduled_str:
+                if not scheduled_str or str(scheduled_str).strip().lower() in ('hozir', 'now', 'none', ''):
                     continue
                     
                 try:
-                    scheduled_dt = datetime.strptime(scheduled_str, "%d.%m.%Y %H:%M")
+                    scheduled_dt = datetime.strptime(scheduled_str.strip(), "%d.%m.%Y %H:%M")
                     diff = (scheduled_dt - now).total_seconds() / 60
                     
                     # Notify 30 minutes before
@@ -67,8 +67,11 @@ async def scheduled_orders_checker(bot: Bot):
                         await mark_order_notified(order_id)
                         logger.info(f"Notification sent for scheduled order #{order_id}")
                         
+                except ValueError:
+                    # Ignore invalid date strings to prevent log spam
+                    pass
                 except Exception as e:
-                    logger.error(f"Error parsing date {scheduled_str} for order #{order_id}: {e}")
+                    logger.warning(f"Error checking schedule for order #{order_id} ({scheduled_str}): {e}")
                     
         except Exception as e:
             logger.error(f"Error in scheduled_orders_checker task: {e}")

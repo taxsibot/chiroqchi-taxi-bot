@@ -133,14 +133,16 @@ async def broadcast_order(bot: Bot, order_id, from_loc, to_loc, price, passenger
                         await bot.send_message(g_id, common_text, reply_markup=group_kb, parse_mode="HTML")
                     logger.info(f"Order #{order_id} broadcast to group/channel {g_id}")
                 except Exception as e:
+                    err_str = str(e).lower()
+                    if any(x in err_str for x in ["chat not found", "forbidden", "kicked", "migrated", "chat_write_forbidden"]):
+                        logger.warning(f"Group {g_id} is unavailable ({e}), skipping.")
+                        continue
                     try:
                         fallback_text = f"{common_text}\n\n👉 <b>Buyurtmani olish:</b> https://t.me/{bot_username}?start=order_{order_id}"
                         await bot.send_message(g_id, fallback_text, parse_mode="HTML")
                         logger.info(f"Order #{order_id} broadcast fallback to {g_id}")
                     except Exception as e2:
                         logger.error(f"Broadcasting failed for group {g_id}: {e2}")
-
-
 
     # ── Phase 2: Admin Notification (IMMEDIATE) ─────────────────────
     if ADMIN_ID and ADMIN_ID != 0:
@@ -158,33 +160,28 @@ async def broadcast_order(bot: Bot, order_id, from_loc, to_loc, price, passenger
     auto_dispatch_radius = float(await get_setting('auto_dispatch_radius', '5'))
 
     def get_distance(d_lat, d_lon):
-        if None in (from_lat, from_lon, d_lat, d_lon):
+        if not (from_lat and from_lon and d_lat and d_lon):
             return None
-        try:
-            # Haversine formula
-            R = 6371.0 # Earth radius in km
-            dlat = math.radians(d_lat - from_lat)
-            dlon = math.radians(d_lon - from_lon)
-            a = math.sin(dlat / 2)**2 + math.cos(math.radians(from_lat)) * math.cos(math.radians(d_lat)) * math.sin(dlon / 2)**2
-            c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-            return R * c
-        except Exception:
-            return None
+        # Haversine formula
+        R = 6371 # Earth radius in km
+        dLat = math.radians(d_lat - from_lat)
+        dLon = math.radians(d_lon - from_lon)
+        a = math.sin(dLat/2) * math.sin(dLat/2) + \
+            math.cos(math.radians(from_lat)) * math.cos(math.radians(d_lat)) * \
+            math.sin(dLon/2) * math.sin(dLon/2)
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+        return R * c
 
-    # Calculate distance for each online driver
-    drivers_with_distance = []
+    filtered_drivers = []
+    # Calculate distance for each driver
     for d in drivers_list:
-        # d: user_id(0), has_priority(1), work_type(2), active_route(3), lat(4), lon(5)
-        d_lat, d_lon = d[4], d[5]
-        dist = get_distance(d_lat, d_lon)
-        drivers_with_distance.append((d[0], d[1], d[2], d[3], dist))
+        d_dist = get_distance(d[4], d[5])
+        filtered_drivers.append((d[0], d[1], d[2], d[3], d_dist))
 
-    # Apply Auto-Dispatch filter if active and coordinates exist
+    # If smart auto-dispatch is active and order has coordinates
     is_smart_dispatched = False
-    filtered_drivers = drivers_with_distance
-    
-    if auto_dispatch_enabled and from_lat is not None and from_lon is not None:
-        radius_drivers = [d for d in drivers_with_distance if d[4] is not None and d[4] <= auto_dispatch_radius]
+    if auto_dispatch_enabled and from_lat and from_lon:
+        radius_drivers = [d for d in filtered_drivers if d[4] is not None and d[4] <= auto_dispatch_radius]
         if radius_drivers:
             filtered_drivers = radius_drivers
             is_smart_dispatched = True
@@ -215,7 +212,8 @@ async def broadcast_order(bot: Bot, order_id, from_loc, to_loc, price, passenger
             text = get_trans(lang, 'order_broadcast').format(
                 from_loc=safe_from, to_loc=safe_to, count=passenger_count, price=price, time_text=time_text
             )
-        text += f"\n🚗 <b>{get_trans(lang, 'profile_class').split(':')[0]}:</b> {class_text}"
+        class_label_word = "Klass" if lang == 'uz' else ("Класс" if lang == 'ru' else "Class")
+        text += f"\n🚗 <b>{class_label_word}:</b> {class_text}"
         
         # Display distance to driver if available
         if distance is not None:

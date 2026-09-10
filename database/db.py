@@ -1086,7 +1086,11 @@ async def get_active_channels():
 async def add_channel(channel_id, invite_link):
     global CHANNELS_LIST_CACHE
     async with db_session() as db:
-        await db.execute("INSERT INTO channels (channel_id, invite_link) VALUES (?, ?)", (channel_id, invite_link))
+        await db.execute("""
+            INSERT INTO channels (channel_id, invite_link, is_active) 
+            VALUES (?, ?, 1)
+            ON CONFLICT(channel_id) DO UPDATE SET invite_link = excluded.invite_link, is_active = 1
+        """, (str(channel_id), invite_link))
         await db.commit()
         CHANNELS_LIST_CACHE = None
 

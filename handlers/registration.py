@@ -44,6 +44,40 @@ async def restart_registration_handler(event: types.Message | types.CallbackQuer
         await event.answer("🔄 Ro'yxatdan o'tish jarayoni qaytadan boshlandi.", reply_markup=types.ReplyKeyboardRemove())
         await start_registration(event, state)
 
+@router.callback_query(F.data == "check_sub_again")
+async def check_sub_again_handler(callback: types.CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+    from utils.cache import SUB_CACHE
+    SUB_CACHE.pop(user_id, None)
+    
+    is_subscribed = await check_subscription(callback.bot, user_id, bypass_cache=True)
+    if is_subscribed:
+        await callback.answer("✅ Rahmat! Obuna tasdiqlandi.", show_alert=False)
+        try:
+            await callback.message.delete()
+        except Exception:
+            pass
+        
+        user = await get_user(user_id)
+        is_admin = user_id == ADMIN_ID
+        if user and user[4]:
+            user_lang = user[8] or 'uz'
+            role = user[4]
+            if role == 'driver':
+                dr = await get_driver(user_id)
+                menu = await get_driver_menu(is_online=dr[6] if dr else False, is_admin=is_admin, lang=user_lang)
+            else:
+                menu = await get_passenger_menu(is_admin=is_admin, lang=user_lang)
+            await callback.message.answer("🎉 <b>Xush kelibsiz!</b>\nBotdan to'liq foydalanishingiz mumkin.", reply_markup=menu, parse_mode="HTML")
+        else:
+            await start_registration(callback.message, state)
+    else:
+        await callback.answer(
+            "❌ Siz hali barcha kanallarga a'zo bo'lmadingiz!\n\n"
+            "Iltimos, ko'rsatilgan kanallarga obuna bo'lib, so'ng qayta tekshiring.",
+            show_alert=True
+        )
+
 @router.message(CommandStart(), StateFilter("*"))
 async def cmd_start(message: types.Message, state: FSMContext):
     user_id = message.from_user.id

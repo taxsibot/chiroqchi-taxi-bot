@@ -7,6 +7,9 @@ from utils.states import AdminStates
 from utils.locales import get_trans
 from .base import admin_filter
 import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = Router()
 
@@ -151,7 +154,9 @@ async def process_txt_edit(message: types.Message, state: FSMContext):
     await state.clear()
 
 @router.callback_query(F.data == "adm_sub", admin_filter)
-async def sub_menu(callback: types.CallbackQuery):
+async def sub_menu(callback: types.CallbackQuery, state: FSMContext = None):
+    if state:
+        await state.clear()
     await callback.answer()
     sub_en = await get_setting('sub_enabled', '0'); channels = await get_active_channels()
     text = f"🛡 <b>Majburiy obuna:</b> {'🟢 ON' if sub_en == '1' else '🔴 OFF'}\n\n"
@@ -173,38 +178,165 @@ async def sub_toggle(callback: types.CallbackQuery):
 
 @router.callback_query(F.data == "ch_add", admin_filter)
 async def ch_add_start(callback: types.CallbackQuery, state: FSMContext):
-    await state.set_state(AdminStates.adding_channel_id); await callback.message.edit_text("Kanal ID yoki @username:")
+    await state.set_state(AdminStates.adding_channel_id)
+    text = (
+        "📢 <b>Yangi kanal ulash:</b>\n"
+        "━━━━━━━━━━━━━━\n"
+        "Kanalni ulash uchun 2 ta qulay usul bor:\n\n"
+        "1️⃣ <b>Eng oson usul:</b> Kanalingizdan ixtiyoriy bitta postni ushbu botga <b>Forward (uzatish)</b> qiling!\n"
+        "2️⃣ Yoki kanalning <b>@username</b> yoki <b>ID</b>sini (-100...) yozib yuboring.\n\n"
+        "⚠️ <b>MUHIM SHART:</b> Bot kanalingizga <b>Administrator</b> qilib qo'shilgan bo'lishi shart!"
+    )
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="adm_sub")]
+    ])
+    await callback.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
 
 @router.message(AdminStates.adding_channel_id, admin_filter)
 async def ch_add_id(message: types.Message, state: FSMContext):
-    cid = message.text.strip()
-    if "/" in cid and not cid.startswith("-100"):
-        # If user pasted a link instead of ID/@username, try to extract username
-        if "t.me/" in cid:
-            parts = cid.split("t.me/")[-1].split("/")
-            if parts:
-                extracted = parts[0].split("?")[0]
-                if extracted: cid = f"@{extracted}"
-    
-    # Simple validation: must be @username or start with -100
-    if not (cid.startswith("@") or cid.startswith("-100")):
-        await message.answer("❌ <b>Xato:</b> Kanal ID -100 bilan boshlanishi yoki @username bo'lishi kerak!")
+    # Check if admin pressed a menu command
+    if message.text and (message.text.startswith("/") or message.text in ["🔙 Ortga", "❌ Bekor qilish"]):
+        await state.clear()
         return
 
-    await state.update_data(cid=cid)
-    await state.set_state(AdminStates.adding_channel_link)
-    await message.answer("<b>Taklif havolasi:</b>\n(Masalan: https://t.me/...)")
+    chat_target = None
+
+    # Method 1: Forwarded post from channel
+    if message.forward_origin and getattr(message.forward_origin, 'type', None) == 'channel':
+        chat_target = getattr(message.forward_origin, 'chat', None)
+    elif message.forward_from_chat and message.forward_from_chat.type == 'channel':
+        chat_target = message.forward_from_chat
+
+    cid = None
+    if chat_target:
+        cid = str(chat_target.id)
+    elif message.text:
+        raw = message.text.strip()
+        # Handle invite links with '+'
+        if "t.me/+" in raw or "t.me/joinchat/" in raw:
+            await message.answer(
+                "⚠️ <b>Yopiq (xususiy) havola kiritildi!</b>\n\n"
+                "Telegram botlar yopiq havoladan kanal ID sini bila olmaydi.\n"
+                "👉 <b>Iltimos, o'sha kanalingizdan bitta xabarni (postni) botga FORWARD (uzatish) qiling.</b>",
+                parse_mode="HTML"
+            )
+            return
+
+        if "t.me/" in raw:
+            parts = raw.split("t.me/")[-1].split("/")
+            if parts:
+                raw = parts[0].split("?")[0]
+
+        if raw.startswith("-100"):
+            cid = raw
+        elif raw.startswith("@"):
+            cid = raw
+        elif raw.replace("_", "").isalnum():
+            cid = f"@{raw}"
+
+    if not cid:
+        await message.answer(
+            "❌ <b>Noto'g'ri format!</b>\n\n"
+            "Iltimos, kanalning <b>@username</b> yoki <b>-100...</b> ID sini yuboring, "
+            "yoki kanaldan bitta xabarni botga <b>Forward</b> qiling.",
+            parse_mode="HTML"
+        )
+        return
+
+    # Verify channel access and admin rights
+    try:
+        chat_info = await message.bot.get_chat(cid)
+    except Exception as e:
+        await message.answer(
+            f"❌ <b>Kanal topilmadi!</b>\n\n"
+            f"Xatolik: <code>{e}</code>\n\n"
+            f"📌 <b>Tekshiring:</b>\n"
+            f"1. Bot kanalingizga administrator qilib qo'shilganmi?\n"
+            f"2. Kanal @username yoki ID si to'g'rimi?",
+            parse_mode="HTML"
+        )
+        return
+
+    # Check bot administrator status in channel
+    try:
+        bot_member = await message.bot.get_chat_member(chat_id=chat_info.id, user_id=message.bot.id)
+        if bot_member.status not in ('administrator', 'creator'):
+            await message.answer(
+                f"⚠️ <b>Bot bu kanalda administrator emas!</b>\n\n"
+                f"Kanal: <b>{chat_info.title}</b>\n\n"
+                f"Bot foydalanuvchilarning obunasini tekshirishi uchun kanalda <b>Administrator</b> bo'lishi shart.\n"
+                f"Iltimos, botni kanalga admin qiling va qayta yuboring.",
+                parse_mode="HTML"
+            )
+            return
+    except Exception as e:
+        logger.warning(f"Could not verify admin rights for {chat_info.id}: {e}")
+
+    # Determine invite link
+    final_link = None
+    if chat_info.username:
+        final_link = f"https://t.me/{chat_info.username}"
+    else:
+        # Private channel: Try auto-generating invite link
+        try:
+            invite = await message.bot.create_chat_invite_link(chat_info.id)
+            final_link = invite.invite_link
+        except Exception:
+            try:
+                final_link = await message.bot.export_chat_invite_link(chat_info.id)
+            except Exception:
+                pass
+
+    if final_link:
+        # Add channel in ONE step
+        channel_identifier = f"@{chat_info.username}" if chat_info.username else str(chat_info.id)
+        await add_channel(channel_identifier, final_link)
+        await message.answer(
+            f"✅ <b>Kanal muvaffaqiyatli ulandi!</b>\n\n"
+            f"📢 Nomi: <b>{chat_info.title}</b>\n"
+            f"🆔 ID: <code>{channel_identifier}</code>\n"
+            f"🔗 Havola: {final_link}",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🔙 Kanallar ro'yxatiga qaytish", callback_data="adm_sub")]
+            ]),
+            parse_mode="HTML"
+        )
+        await state.clear()
+    else:
+        # Ask for invite link if auto-generation failed
+        await state.update_data(cid=str(chat_info.id), title=chat_info.title)
+        await state.set_state(AdminStates.adding_channel_link)
+        await message.answer(
+            f"✅ Kanal topildi: <b>{chat_info.title}</b>\n\n"
+            f"🔗 Endi ushbu kanal uchun <b>taklif havolasini (invite link)</b> yuboring:\n"
+            f"(Masalan: <code>https://t.me/+AbCdEf...</code>)",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="adm_sub")]
+            ]),
+            parse_mode="HTML"
+        )
 
 @router.message(AdminStates.adding_channel_link, admin_filter)
 async def ch_add_finish(message: types.Message, state: FSMContext):
-    link = message.text.strip()
+    link = (message.text or "").strip()
     if not link.startswith("http"):
         await message.answer("❌ <b>Xato:</b> Havola http:// yoki https:// bilan boshlanishi kerak!")
         return
         
     data = await state.get_data()
-    await add_channel(data['cid'], link)
-    await message.answer(f"✅ <b>Kanal muvaffaqiyatli qo'shildi!</b>\n🆔 ID: <code>{data['cid']}</code>\n🔗 Link: {link}", parse_mode="HTML")
+    cid = data.get('cid')
+    title = data.get('title', 'Kanal')
+    await add_channel(cid, link)
+    await message.answer(
+        f"✅ <b>Kanal muvaffaqiyatli ulandi!</b>\n\n"
+        f"📢 Nomi: <b>{title}</b>\n"
+        f"🆔 ID: <code>{cid}</code>\n"
+        f"🔗 Havola: {link}",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔙 Kanallar ro'yxatiga qaytish", callback_data="adm_sub")]
+        ]),
+        parse_mode="HTML"
+    )
     await state.clear()
 
 # --- ❤️ CHARITY MANAGEMENT ---

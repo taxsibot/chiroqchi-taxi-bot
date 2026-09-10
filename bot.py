@@ -91,10 +91,10 @@ async def main():
     # Session configuration (optimized for aiogram 3.x)
     session = None
     if USE_PROXY and PROXY_URL:
-        session = AiohttpSession(proxy=PROXY_URL, timeout=30.0)
+        session = AiohttpSession(proxy=PROXY_URL, timeout=60.0)
         logging.info(f"Using proxy: {PROXY_URL}")
     else:
-        session = AiohttpSession(timeout=30.0)
+        session = AiohttpSession(timeout=60.0)
     
     # Initialize bot and dispatcher
     bot = Bot(
@@ -217,19 +217,24 @@ async def main():
 
     dp.startup.register(on_startup)
     
-    # Start polling
-    try:
-        await dp.start_polling(
-            bot, 
-            allowed_updates=["message", "callback_query", "chat_member", "my_chat_member", "chat_join_request", "inline_query", "channel_post", "edited_channel_post", "edited_message"]
-        )
-
-    except Exception as e:
-        logger.error(f"Bot startup/polling error: {e}")
-    finally:
-        from database.db import close_db
-        await close_db()
-        await bot.session.close()
+    # Start polling with automatic reconnect loop
+    while True:
+        try:
+            await dp.start_polling(
+                bot, 
+                allowed_updates=["message", "callback_query", "chat_member", "my_chat_member", "chat_join_request", "inline_query", "channel_post", "edited_channel_post", "edited_message"]
+            )
+            break
+        except (KeyboardInterrupt, SystemExit):
+            break
+        except Exception as e:
+            logger.error(f"Telegram polling error: {e}. Reconnecting in 5 seconds...")
+            await asyncio.sleep(5)
+    
+    # Graceful shutdown
+    from database.db import close_db
+    await close_db()
+    await bot.session.close()
 
 if __name__ == "__main__":
     try:

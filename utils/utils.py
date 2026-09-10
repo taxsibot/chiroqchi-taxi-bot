@@ -63,6 +63,14 @@ async def check_subscription(bot: Bot, user_id: int, bypass_cache: bool = False)
                 is_subscribed = False
                 logger.info(f"User {user_id} is NOT subbed to {cid} (Status: {member.status})")
                 break
+            elif member.status == 'restricted':
+                if not getattr(member, 'is_member', True):
+                    is_subscribed = False
+                    logger.info(f"User {user_id} is restricted non-member in {cid}")
+                    break
+            elif member.status not in ['creator', 'administrator', 'member']:
+                is_subscribed = False
+                break
         except Exception as e:
             if "chat not found" in str(e).lower():
                 logger.warning(f"Channel {channel_id} not found. Please check if bot is admin and ID is correct.")
@@ -82,10 +90,16 @@ async def get_subscription_keyboard():
     buttons = []
     for idx, channel in enumerate(active_channels):
         cid, url = channel
-        if url and url.startswith("@"):
+        if not url:
+            if cid and cid.startswith("@"):
+                url = f"https://t.me/{cid[1:]}"
+            else:
+                continue
+        elif url.startswith("@"):
             url = f"https://t.me/{url[1:]}"
+        elif not url.startswith("http"):
+            url = f"https://{url}"
         
-        # Try to make the button text more descriptive if possible
         btn_text = f"📢 {idx+1}-kanalga a'zo bo'lish"
         buttons.append([InlineKeyboardButton(text=btn_text, url=url)])
     
