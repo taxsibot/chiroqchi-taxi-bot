@@ -79,7 +79,8 @@ _MODULE_MAP = {
     "🚗 Haydovchilar":     "adm_drivers",
     "📦 Buyurtmalar":      "adm_orders",
     "📢 Reklama":          "adm_broadcast",
-    "👥 Guruh & Kanal":    "adm_groups",
+    "💬 Guruhlar":         "adm_groups",
+    "📢 Kanallar":         "adm_channels",
     "💳 Moliya":           "adm_finance",
     "⚙️ Sozlamalar":       "adm_settings",
     "👑 Adminlar":         "adm_mgmt",
@@ -121,7 +122,8 @@ async def admin_reply_btn_handler(message: types.Message, state: FSMContext):
         "adm_drivers":   "🚗 Haydovchilar markazi",
         "adm_orders":    "📦 Buyurtmalar nazorati",
         "adm_broadcast": "📢 Reklama & Xabarnoma",
-        "adm_groups":    "👥 Guruh va Kanallar",
+        "adm_groups":    "💬 Buyurtma Guruhlari",
+        "adm_channels":  "📢 Majburiy Kanallar",
         "adm_finance":   "💳 Moliya & Promokodlar",
         "adm_settings":  "⚙️ Tizim Sozlamalari",
         "adm_mgmt":      "👑 Adminlar boshqaruvi",
@@ -140,61 +142,95 @@ async def admin_reply_btn_handler(message: types.Message, state: FSMContext):
 # Add group management here since it's relatively small and shares many imports
 # --- 👥 GURUH VA KANALLAR BOSHQARUVI ---
 
-@router.callback_query(F.data.in_({"adm_groups", "adm_sub"}), admin_filter)
-async def adm_groups_list(callback: types.CallbackQuery):
+# ─────────────────────────────────────────────────────────────────
+# 💬 BUYURTMA GURUHLARI sahifasi
+# ─────────────────────────────────────────────────────────────────
+
+@router.callback_query(F.data.in_({"adm_groups", "adm_groups_refresh"}), admin_filter)
+async def adm_groups_page(callback: types.CallbackQuery):
     await callback.answer()
-    from database.db import get_all_groups, get_active_channels, get_setting
-    
+    from database.db import get_all_groups, get_setting
+
     groups = await get_all_groups()
-    channels = await get_active_channels()
-    sub_en = await get_setting('sub_enabled', '0')
-    sub_icon = "✅ YOQILGAN" if sub_en == '1' else "❌ O'CHIRILGAN"
     gb_enabled = await get_setting('group_broadcasting_enabled', '1')
     gb_status = "✅ YOQILGAN" if gb_enabled == '1' else "❌ O'CHIRILGAN"
-    
+
     text = (
-        "👥 <b>GURUH VA KANALLAR BOSHQARUVI</b>\n"
+        "💬 <b>BUYURTMA GURUHLARI</b>\n"
         "━━━━━━━━━━━━━━━━━━━━━━━\n\n"
         f"📢 <b>Guruhlarga efir:</b> {gb_status}\n"
-        f"🛡 <b>Majburiy obuna:</b> {sub_icon}\n"
-        f"💬 <b>Buyurtma guruhlari:</b> {len(groups)} ta\n"
-        f"📢 <b>Majburiy kanallar:</b> {len(channels)} ta\n\n"
-        "<i>Quyidagi tugmalar orqali boshqaring:</i>"
+        f"💬 <b>Jami guruhlar:</b> {len(groups)} ta\n\n"
+        "Guruhni o'chirish uchun 🗑 tugmasini bosing.\n"
+        "Buyurtma turini almashtirish uchun taxi/parsel tugmalarini bosing."
     )
-    
+
     rows = [
         [
             InlineKeyboardButton(text=f"📢 Efir: {gb_status}", callback_data="toggle_gb_global"),
-            InlineKeyboardButton(text=f"🛡 Obuna: {sub_icon}", callback_data="toggle_sub_global")
         ]
     ]
-    
+
     if groups:
-        rows.append([InlineKeyboardButton(text="--- 💬 BUYURTMA GURUHLARI ---", callback_data="none")])
-        for g in groups[:10]:
+        for g in groups[:15]:
             rows.append([
                 InlineKeyboardButton(text="🚕✅" if g[3] == 1 else "🚕❌", callback_data=f"toggle_group_taxi_{g[0]}"),
                 InlineKeyboardButton(text="📦✅" if g[4] == 1 else "📦❌", callback_data=f"toggle_group_parcel_{g[0]}"),
                 InlineKeyboardButton(text=f"🗑 {g[1] or g[0]}", callback_data=f"del_group_{g[0]}")
             ])
-            
-    if channels:
-        rows.append([InlineKeyboardButton(text="--- 📢 MAJBURIY KANALLAR ---", callback_data="none")])
-        for ch in channels[:5]:
-            rows.append([
-                InlineKeyboardButton(text=f"🗑 {ch[1] or ch[0]}", callback_data=f"del_channel_{ch[0]}")
-            ])
-            
-    rows.append([
-        InlineKeyboardButton(text="➕ Guruh qo'shish", callback_data="adm_add_group_manual"),
-        InlineKeyboardButton(text="➕ Kanal qo'shish", callback_data="ch_add")
-    ])
+    else:
+        rows.append([InlineKeyboardButton(text="⚠️ Guruhlar yo'q", callback_data="none")])
+
+    rows.append([InlineKeyboardButton(text="➕ Guruh qo'shish", callback_data="adm_add_group_manual")])
     rows.append([InlineKeyboardButton(text="🔙 Ortga", callback_data="adm_main")])
-    
+
     try:
         await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=rows), parse_mode="HTML")
     except:
-        pass
+        await callback.message.answer(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=rows), parse_mode="HTML")
+
+
+# ─────────────────────────────────────────────────────────────────
+# 📢 MAJBURIY KANALLAR sahifasi
+# ─────────────────────────────────────────────────────────────────
+
+@router.callback_query(F.data.in_({"adm_channels", "adm_sub", "adm_channels_refresh"}), admin_filter)
+async def adm_channels_page(callback: types.CallbackQuery):
+    await callback.answer()
+    from database.db import get_active_channels, get_setting
+
+    channels = await get_active_channels()
+    sub_en = await get_setting('sub_enabled', '0')
+    sub_icon = "✅ YOQILGAN" if sub_en == '1' else "❌ O'CHIRILGAN"
+
+    text = (
+        "📢 <b>MAJBURIY KANALLAR (Obuna)</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"🛡 <b>Majburiy obuna:</b> {sub_icon}\n"
+        f"📢 <b>Jami kanallar:</b> {len(channels)} ta\n\n"
+        "Kanalni o'chirish uchun 🗑 tugmasini bosing."
+    )
+
+    rows = [
+        [
+            InlineKeyboardButton(text=f"🛡 Obuna: {sub_icon}", callback_data="toggle_sub_global"),
+        ]
+    ]
+
+    if channels:
+        for ch in channels[:10]:
+            rows.append([
+                InlineKeyboardButton(text=f"🗑 {ch[1] or ch[0]}", callback_data=f"del_channel_{ch[0]}")
+            ])
+    else:
+        rows.append([InlineKeyboardButton(text="⚠️ Kanallar yo'q", callback_data="none")])
+
+    rows.append([InlineKeyboardButton(text="➕ Kanal qo'shish", callback_data="ch_add")])
+    rows.append([InlineKeyboardButton(text="🔙 Ortga", callback_data="adm_main")])
+
+    try:
+        await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=rows), parse_mode="HTML")
+    except:
+        await callback.message.answer(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=rows), parse_mode="HTML")
 
 
 @router.callback_query(F.data == "toggle_sub_global", admin_filter)
@@ -204,7 +240,7 @@ async def toggle_sub_global_handler(callback: types.CallbackQuery):
     new_val = '0' if curr == '1' else '1'
     await update_setting('sub_enabled', new_val)
     await callback.answer("Majburiy obuna holati o'zgartirildi.")
-    await adm_groups_list(callback)
+    await adm_channels_page(callback)
 
 
 @router.callback_query(F.data == "toggle_gb_global", admin_filter)
@@ -215,7 +251,7 @@ async def toggle_gb_global_handler(callback: types.CallbackQuery):
     await update_setting('group_broadcasting_enabled', new_val)
     status_text = "yoqildi" if new_val == '1' else "o'chirildi"
     await callback.answer(f"Global efir {status_text}")
-    await adm_groups_list(callback)
+    await adm_groups_page(callback)
 
 
 @router.callback_query(F.data.startswith("toggle_group_"), admin_filter)
@@ -237,7 +273,7 @@ async def toggle_group_type_handler(callback: types.CallbackQuery):
         await toggle_group_parcel_channel(g_id, new_status)
         
     await callback.answer("O'zgartirildi.")
-    await adm_groups_list(callback)
+    await adm_groups_page(callback)
 
 
 @router.callback_query(F.data.startswith("del_group_"), admin_filter)
@@ -246,7 +282,7 @@ async def del_group_handler(callback: types.CallbackQuery):
     from database.db import delete_group
     await delete_group(g_id)
     await callback.answer("Guruh o'chirildi.")
-    await adm_groups_list(callback)
+    await adm_groups_page(callback)
 
 
 @router.callback_query(F.data.startswith("del_channel_"), admin_filter)
@@ -255,7 +291,7 @@ async def del_channel_handler(callback: types.CallbackQuery):
     from database.db import remove_channel
     await remove_channel(ch_id)
     await callback.answer("Kanal o'chirildi.")
-    await adm_groups_list(callback)
+    await adm_channels_page(callback)
 
 
 @router.callback_query(F.data == "adm_add_group_manual", admin_filter)

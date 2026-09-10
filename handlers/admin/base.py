@@ -29,7 +29,8 @@ def get_admin_reply_kb(user_id, permissions='all') -> ReplyKeyboardMarkup:
         ("🚗 Haydovchilar",    "🚗 Haydovchilar"),
         ("📦 Buyurtmalar",     "📦 Buyurtmalar"),
         ("📢 Reklama",         "📢 Reklama"),
-        ("👥 Guruh & Kanal",   "👥 Guruh & Kanal"),
+        ("💬 Guruhlar",        "💬 Guruhlar"),
+        ("📢 Kanallar",        "📢 Kanallar"),
         ("💳 Moliya",          "💳 Moliya"),
         ("⚙️ Sozlamalar",      "⚙️ Sozlamalar"),
     ]
@@ -77,7 +78,8 @@ def get_admin_main_kb(user_id, permissions='all') -> InlineKeyboardMarkup:
         ("🚗 Haydovchilar",          "adm_drivers"),
         ("📦 Buyurtmalar",           "adm_orders"),
         ("📢 Reklama & Xabarnoma",   "adm_broadcast"),
-        ("👥 Guruh va Kanallar",     "adm_groups"),
+        ("💬 Buyurtma Guruhlari",    "adm_groups"),
+        ("📢 Majburiy Kanallar",     "adm_channels"),
         ("💳 Moliya & Promokodlar",  "adm_finance"),
         ("⚙️ Tizim Sozlamalari",     "adm_settings"),
     ]

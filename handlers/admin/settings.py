@@ -188,7 +188,7 @@ async def ch_add_start(callback: types.CallbackQuery, state: FSMContext):
         "⚠️ <b>MUHIM SHART:</b> Bot kanalingizga <b>Administrator</b> qilib qo'shilgan bo'lishi shart!"
     )
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="adm_groups")]
+        [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="adm_channels")]
     ])
     await callback.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
 
@@ -219,7 +219,7 @@ async def ch_add_id(message: types.Message, state: FSMContext):
                 "Telegram botlar yopiq havoladan kanal ID sini bila olmaydi.\n"
                 "👉 <b>Iltimos, o'sha kanalingizdan bitta xabarni (postni) botga FORWARD (uzatish) qiling.</b>",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="adm_groups")]
+                    [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="adm_channels")]
                 ]),
                 parse_mode="HTML"
             )
@@ -277,7 +277,7 @@ async def ch_add_id(message: types.Message, state: FSMContext):
                 f"Bot foydalanuvchilarning obunasini tekshirishi uchun kanalda <b>Administrator</b> bo'lishi shart.\n"
                 f"Iltimos, botni kanalga admin qiling va qayta yuboring.",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="adm_groups")]
+                    [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="adm_channels")]
                 ]),
                 parse_mode="HTML"
             )
@@ -310,7 +310,7 @@ async def ch_add_id(message: types.Message, state: FSMContext):
             f"🆔 ID: <code>{channel_identifier}</code>\n"
             f"🔗 Havola: {final_link}",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🔙 Kanallar ro'yxatiga qaytish", callback_data="adm_groups")]
+                [InlineKeyboardButton(text="🔙 Kanallar ro'yxatiga qaytish", callback_data="adm_channels")]
             ]),
             parse_mode="HTML"
         )
@@ -346,7 +346,7 @@ async def ch_add_finish(message: types.Message, state: FSMContext):
         f"🆔 ID: <code>{cid}</code>\n"
         f"🔗 Havola: {link}",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔙 Kanallar ro'yxatiga qaytish", callback_data="adm_groups")]
+            [InlineKeyboardButton(text="🔙 Kanallar ro'yxatiga qaytish", callback_data="adm_channels")]
         ]),
         parse_mode="HTML"
     )
