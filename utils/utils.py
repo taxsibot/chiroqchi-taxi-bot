@@ -58,7 +58,8 @@ async def check_subscription(bot: Bot, user_id: int, bypass_cache: bool = False)
     for channel_id, _ in c_list:
         try:
             cid = str(channel_id).strip()
-            member = await bot.get_chat_member(chat_id=cid, user_id=user_id)
+            target_chat = int(cid) if ((cid.startswith("-") and cid[1:].isdigit()) or cid.isdigit()) else cid
+            member = await bot.get_chat_member(chat_id=target_chat, user_id=user_id)
             if member.status in ['left', 'kicked']:
                 is_subscribed = False
                 logger.info(f"User {user_id} is NOT subbed to {cid} (Status: {member.status})")

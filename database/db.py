@@ -1272,6 +1272,11 @@ async def get_user_full_order_history(user_id, role='passenger'):
             return await cursor.fetchall()
 
 async def add_group(chat_id, title):
+    try:
+        int_chat_id = int(str(chat_id).strip())
+    except (ValueError, TypeError):
+        logger.error(f"Cannot add group with invalid chat_id: {chat_id}")
+        return False
     async with db_session() as db:
         await db.execute("""
             INSERT INTO groups (chat_id, title, is_order_channel, is_parcel_channel) 
@@ -1280,12 +1285,17 @@ async def add_group(chat_id, title):
                 title = excluded.title,
                 is_order_channel = 1,
                 is_parcel_channel = 1
-        """, (chat_id, title))
+        """, (int_chat_id, title))
         await db.commit()
+    return True
 
 async def delete_group(chat_id):
+    try:
+        int_chat_id = int(str(chat_id).strip())
+    except (ValueError, TypeError):
+        int_chat_id = chat_id
     async with db_session() as db:
-        await db.execute("DELETE FROM groups WHERE chat_id = ?", (chat_id,))
+        await db.execute("DELETE FROM groups WHERE chat_id = ?", (int_chat_id,))
         await db.commit()
 
 async def clear_all_groups():

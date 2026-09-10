@@ -78,7 +78,7 @@ async def check_sub_again_handler(callback: types.CallbackQuery, state: FSMConte
             show_alert=True
         )
 
-@router.message(CommandStart(), StateFilter("*"))
+@router.message(F.chat.type == "private", CommandStart(), StateFilter("*"))
 async def cmd_start(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     

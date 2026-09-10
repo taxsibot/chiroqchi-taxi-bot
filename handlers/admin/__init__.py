@@ -263,21 +263,147 @@ async def adm_add_group_manual_handler(callback: types.CallbackQuery, state: FSM
     from utils.states import AdminStates
     await state.set_state(AdminStates.adding_group_id)
     await callback.answer()
+    text = (
+        "➕ <b>Yangi guruh ulash:</b>\n"
+        "━━━━━━━━━━━━━━\n"
+        "Guruhni ulash uchun quyidagi usullardan birini tanlang:\n\n"
+        "1️⃣ <b>Eng oson usul:</b> Guruhdan ixtiyoriy bitta xabarni ushbu botga <b>FORWARD (uzatish)</b> qiling!\n"
+        "2️⃣ Guruh havolasini (<code>https://t.me/...</code>) yoki <b>@username</b>ini yuboring.\n"
+        "3️⃣ Yoki guruhning <b>-100...</b> ID raqamini yozib yuboring.\n\n"
+        "⚠️ <b>MUHIM:</b> Buyurtmalar yetib borishi uchun bot guruhda <b>Administrator</b> bo'lishi shart!"
+    )
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="adm_groups")]
+    ])
     try:
-        await callback.message.edit_text(
-            "➕ <b>Guruh ID yoki havolasini kiriting:</b>\n\nMasalan: <code>-1001234567890</code>",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="❌ Bekor qilish", callback_data="adm_groups")]]),
-            parse_mode="HTML"
-        )
+        await callback.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
     except:
         pass
 
 
 @router.message(AdminStates.adding_group_id, admin_filter)
 async def process_add_group_id(message: types.Message, state: FSMContext):
-    g_id = message.text.strip()
+    # 0. Check cancellation
+    if message.text and (message.text.startswith("/") or message.text in ["🔙 Ortga", "❌ Bekor qilish"]):
+        await state.clear()
+        return
+
+    chat_target = None
+
+    # 1. Forwarded message from group or channel
+    if message.forward_origin:
+        f_type = getattr(message.forward_origin, 'type', None)
+        if f_type in ('channel', 'chat'):
+            chat_target = getattr(message.forward_origin, 'chat', None)
+    elif message.forward_from_chat:
+        chat_target = message.forward_from_chat
+
+    target = None
+    if chat_target:
+        target = chat_target.id
+    elif message.text:
+        raw = message.text.strip()
+        
+        # Check for private invite links (+...)
+        if "t.me/+" in raw or "t.me/joinchat/" in raw:
+            await message.answer(
+                "⚠️ <b>Yopiq (xususiy) havola kiritildi!</b>\n\n"
+                "Telegram botlar yopiq havoladan guruh ID sini to'g'ridan-to'g'ri aniqlay olmaydi.\n\n"
+                "👉 <b>Buning juda oson yo'li:</b>\n"
+                "1. Botni o'sha guruhga <b>Administrator</b> qilib qo'shing.\n"
+                "2. O'sha guruhdan bitta xabarni ushbu botga <b>FORWARD (uzatish)</b> qiling!\n"
+                "Yoki guruhning <code>-100...</code> ID sini yuboring.",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="adm_groups")]
+                ]),
+                parse_mode="HTML"
+            )
+            return
+
+        # Clean URL if provided
+        if "t.me/" in raw:
+            parts = raw.split("t.me/")[-1].split("/")
+            if parts:
+                raw = parts[0].split("?")[0]
+        
+        raw = raw.strip()
+        if (raw.startswith("-") and raw[1:].isdigit()) or raw.isdigit():
+            target = int(raw)
+        elif raw.startswith("@"):
+            target = raw
+        elif raw:
+            target = f"@{raw}"
+
+    if not target:
+        await message.answer(
+            "❌ <b>Noto'g'ri format!</b>\n\n"
+            "Iltimos, guruh havolasi, <b>@username</b> yoki <b>-100...</b> ID sini yuboring, "
+            "yoki guruhdan bitta xabarni <b>Forward</b> qiling.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="adm_groups")]
+            ]),
+            parse_mode="HTML"
+        )
+        return
+
+    # 2. Get chat info from Telegram
+    chat_info = None
+    try:
+        chat_info = await message.bot.get_chat(target)
+    except Exception as e:
+        # If target was already an integer, we might still accept it with fallback title
+        if isinstance(target, int):
+            chat_info = None
+        else:
+            await message.answer(
+                f"❌ <b>Guruh topilmadi!</b>\n\n"
+                f"Tafsilot: <code>{e}</code>\n\n"
+                f"📌 <b>Tekshiring:</b>\n"
+                f"1. Bot guruhga qo'shilgan va <b>Administrator</b> qilinganmi?\n"
+                f"2. Guruh havolasi yoki @username to'g'rimi?\n\n"
+                f"💡 <i>Eng oson usul: Guruhdan bitta xabarni bu yerga Forward qiling.</i>",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="adm_groups")]
+                ]),
+                parse_mode="HTML"
+            )
+            return
+
+    group_id = int(chat_info.id) if chat_info else int(target)
+    group_title = (chat_info.title if chat_info and chat_info.title else f"Guruh {group_id}")
+
+    # 3. Check bot administrator status
+    is_admin = False
+    if chat_info:
+        try:
+            bot_member = await message.bot.get_chat_member(chat_id=group_id, user_id=message.bot.id)
+            is_admin = bot_member.status in ('administrator', 'creator')
+        except Exception:
+            pass
+
+    # 4. Save to Database
     from database.db import add_group
-    await add_group(g_id, f"Guruh {g_id}")
-    await message.answer(f"✅ Guruh qo'shildi: {g_id}")
+    await add_group(group_id, group_title)
+
+    admin_status_note = ""
+    if is_admin:
+        admin_status_note = "\n🛡 <b>Bot holati:</b> Administrator ✅"
+    else:
+        admin_status_note = (
+            "\n\n⚠️ <b>DIQQAT:</b> Bot hozircha bu guruhda <b>Administrator</b> emas!\n"
+            "Buyurtmalar guruhga yetkazilishi va bot to'liq ishlashi uchun botni guruhda <b>Administrator</b> qiling."
+        )
+
+    await message.answer(
+        f"✅ <b>Guruh muvaffaqiyatli ulandi!</b>\n\n"
+        f"💬 Nomi: <b>{group_title}</b>\n"
+        f"🆔 ID: <code>{group_id}</code>"
+        f"{admin_status_note}",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="👥 Guruhlar ro'yxatiga qaytish", callback_data="adm_groups")]
+        ]),
+        parse_mode="HTML"
+    )
     await state.clear()
+
 

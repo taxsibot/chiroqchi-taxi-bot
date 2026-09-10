@@ -261,6 +261,21 @@ TRANSLATIONS = {
         'ai_thinking': "🤖 <i>AI o'ylamoqda...</i>",
         'ai_error': "❌ Kechirasiz, AI hozirda javob bera olmaydi. Iltimos, keyinroq urinib ko'ring.",
         'go_to_bot': "🚀 Botga o'tish",
+        'group_info_text': (
+            "🚕 <b>CHIROQCHI TAKSI — RASMIY YORDAMCHI</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "🤖 Ushbu guruhda bot quyidagi vazifalarni bajaradi:\n\n"
+            "• 🚕 <b>Taksi chaqirish:</b> Toshkent ⇄ Qashqadaryo va boshqa viloyatlar\n"
+            "• 📦 <b>Pochta yuborish:</b> Tezkor va ishonchli yetkazib berish\n"
+            "• 🚗 <b>Haydovchilar uchun:</b> Doimiy buyurtmalar oqimi\n"
+            "• 🛡 <b>Tartib va xavfsizlik:</b> Guruh a'zolarini va obunani nazorat qilish\n\n"
+            "📌 <b>Guruh buyruqlari:</b>\n"
+            "• /start — Ishni boshlash\n"
+            "• /info — Bot haqida to'liq ma'lumot\n"
+            "• /bot — Guruh sozlamalari (faqat adminlar uchun)\n\n"
+            "💡 <b>Xizmatlardan to'liq foydalanish uchun botga o'ting!</b>"
+        ),
+        'greeting_reply': "👋 <b>Assalomu alaykum, {name}!</b>\n\nQanday xizmat kerak? Quyidagi menyudan kerakli bo'limni tanlang 👇",
     },
     'ru': {
         'ai_btn': "🤖 AI Вопросы и ответы",
@@ -517,6 +532,21 @@ TRANSLATIONS = {
         'ai_thinking': "🤖 <i>AI думает...</i>",
         'ai_error': "❌ Извините, AI сейчас недоступен. Попробуйте позже.",
         'go_to_bot': "🚀 Перейти в бот",
+        'group_info_text': (
+            "🚕 <b>ЧИРОКЧИ ТАКСИ — ОФИЦИАЛЬНЫЙ ПОМОЩНИК</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "🤖 В этой группе бот выполняет следующие функции:\n\n"
+            "• 🚕 <b>Заказ такси:</b> Ташкент ⇄ Кашкадарья и междугородние поездки\n"
+            "• 📦 <b>Отправка почты:</b> Быстрая и надёжная доставка посылок\n"
+            "• 🚗 <b>Для водителей:</b> Постоянный поток заказов\n"
+            "• 🛡 <b>Порядок и контроль:</b> Проверка подписки участников\n\n"
+            "📌 <b>Команды группы:</b>\n"
+            "• /start — Начать работу\n"
+            "• /info — Информация о боте\n"
+            "• /bot — Настройки группы (для админов)\n\n"
+            "💡 <b>Для заказа такси перейдите в самого бота!</b>"
+        ),
+        'greeting_reply': "👋 <b>Здравствуйте, {name}!</b>\n\nЧем могу помочь? Выберите нужный раздел в меню ниже 👇",
     },
     'en': {
         'order_taxi': "🚕 Order Taxi",
@@ -758,6 +788,21 @@ TRANSLATIONS = {
         'ai_thinking': "🤖 <i>AI is thinking...</i>",
         'ai_error': "❌ Sorry, AI is currently unavailable. Please try again later.",
         'go_to_bot': "🚀 Go to Bot",
+        'group_info_text': (
+            "🚕 <b>CHIROQCHI TAXI — OFFICIAL ASSISTANT</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "🤖 This bot provides the following services in this group:\n\n"
+            "• 🚕 <b>Order Taxi:</b> Tashkent ⇄ Kashkadarya & intercity routes\n"
+            "• 📦 <b>Send Parcels:</b> Fast and secure parcel delivery\n"
+            "• 🚗 <b>For Drivers:</b> Continuous flow of orders\n"
+            "• 🛡 <b>Order & Control:</b> Group membership and subscription control\n\n"
+            "📌 <b>Group commands:</b>\n"
+            "• /start — Start bot\n"
+            "• /info — Bot information\n"
+            "• /bot — Group settings (Admins only)\n\n"
+            "💡 <b>Switch to the private bot to place orders!</b>"
+        ),
+        'greeting_reply': "👋 <b>Hello, {name}!</b>\n\nHow can I help you? Please choose from the menu below 👇",
     }
 }
 
@@ -776,14 +821,15 @@ def get_trans(lang, key):
     if result:
         return result
     
-    # SAFETY FALLBACK: Never show raw technical keys
-    if "msg" in key.lower() or "_" in key:
-        # If it looks like a technical key, return a generic friendly message
-        fallbacks = {
-            'uz': "ℹ️ Ma'lumot yuklanmoqda...",
-            'ru': "ℹ️ Загрузка информации...",
-            'en': "ℹ️ Loading information..."
-        }
-        return fallbacks.get(lang, fallbacks['uz'])
+    # Fallback to defaults if specific keys
+    if key == 'group_info_text':
+        return (
+            "🚕 <b>CHIROQCHI TAKSI — RASMIY YORDAMCHI</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "🤖 Ushbu guruhda bot buyurtmalar va obunani boshqaradi.\n\n"
+            "💡 <i>Xizmatlardan to'liq foydalanish uchun botga o'ting!</i>"
+        )
+    if key == 'greeting_reply':
+        return "👋 <b>Assalomu alaykum!</b>\n\nKerakli bo'limni tanlang 👇"
         
     return key

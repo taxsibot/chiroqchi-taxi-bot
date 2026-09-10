@@ -188,7 +188,7 @@ async def ch_add_start(callback: types.CallbackQuery, state: FSMContext):
         "⚠️ <b>MUHIM SHART:</b> Bot kanalingizga <b>Administrator</b> qilib qo'shilgan bo'lishi shart!"
     )
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="adm_sub")]
+        [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="adm_groups")]
     ])
     await callback.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
 
@@ -202,14 +202,14 @@ async def ch_add_id(message: types.Message, state: FSMContext):
     chat_target = None
 
     # Method 1: Forwarded post from channel
-    if message.forward_origin and getattr(message.forward_origin, 'type', None) == 'channel':
+    if message.forward_origin and getattr(message.forward_origin, 'type', None) in ('channel', 'chat'):
         chat_target = getattr(message.forward_origin, 'chat', None)
-    elif message.forward_from_chat and message.forward_from_chat.type == 'channel':
+    elif message.forward_from_chat:
         chat_target = message.forward_from_chat
 
     cid = None
     if chat_target:
-        cid = str(chat_target.id)
+        cid = chat_target.id
     elif message.text:
         raw = message.text.strip()
         # Handle invite links with '+'
@@ -218,6 +218,9 @@ async def ch_add_id(message: types.Message, state: FSMContext):
                 "⚠️ <b>Yopiq (xususiy) havola kiritildi!</b>\n\n"
                 "Telegram botlar yopiq havoladan kanal ID sini bila olmaydi.\n"
                 "👉 <b>Iltimos, o'sha kanalingizdan bitta xabarni (postni) botga FORWARD (uzatish) qiling.</b>",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="adm_groups")]
+                ]),
                 parse_mode="HTML"
             )
             return
@@ -227,11 +230,12 @@ async def ch_add_id(message: types.Message, state: FSMContext):
             if parts:
                 raw = parts[0].split("?")[0]
 
-        if raw.startswith("-100"):
-            cid = raw
+        raw = raw.strip()
+        if (raw.startswith("-") and raw[1:].isdigit()) or raw.isdigit():
+            cid = int(raw)
         elif raw.startswith("@"):
             cid = raw
-        elif raw.replace("_", "").isalnum():
+        elif raw:
             cid = f"@{raw}"
 
     if not cid:
@@ -239,6 +243,9 @@ async def ch_add_id(message: types.Message, state: FSMContext):
             "❌ <b>Noto'g'ri format!</b>\n\n"
             "Iltimos, kanalning <b>@username</b> yoki <b>-100...</b> ID sini yuboring, "
             "yoki kanaldan bitta xabarni botga <b>Forward</b> qiling.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="adm_groups")]
+            ]),
             parse_mode="HTML"
         )
         return
@@ -253,6 +260,9 @@ async def ch_add_id(message: types.Message, state: FSMContext):
             f"📌 <b>Tekshiring:</b>\n"
             f"1. Bot kanalingizga administrator qilib qo'shilganmi?\n"
             f"2. Kanal @username yoki ID si to'g'rimi?",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="adm_groups")]
+            ]),
             parse_mode="HTML"
         )
         return
@@ -266,6 +276,9 @@ async def ch_add_id(message: types.Message, state: FSMContext):
                 f"Kanal: <b>{chat_info.title}</b>\n\n"
                 f"Bot foydalanuvchilarning obunasini tekshirishi uchun kanalda <b>Administrator</b> bo'lishi shart.\n"
                 f"Iltimos, botni kanalga admin qiling va qayta yuboring.",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="adm_groups")]
+                ]),
                 parse_mode="HTML"
             )
             return
@@ -297,7 +310,7 @@ async def ch_add_id(message: types.Message, state: FSMContext):
             f"🆔 ID: <code>{channel_identifier}</code>\n"
             f"🔗 Havola: {final_link}",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🔙 Kanallar ro'yxatiga qaytish", callback_data="adm_sub")]
+                [InlineKeyboardButton(text="🔙 Kanallar ro'yxatiga qaytish", callback_data="adm_groups")]
             ]),
             parse_mode="HTML"
         )
@@ -311,7 +324,7 @@ async def ch_add_id(message: types.Message, state: FSMContext):
             f"🔗 Endi ushbu kanal uchun <b>taklif havolasini (invite link)</b> yuboring:\n"
             f"(Masalan: <code>https://t.me/+AbCdEf...</code>)",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="adm_sub")]
+                [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="adm_groups")]
             ]),
             parse_mode="HTML"
         )
@@ -333,7 +346,7 @@ async def ch_add_finish(message: types.Message, state: FSMContext):
         f"🆔 ID: <code>{cid}</code>\n"
         f"🔗 Havola: {link}",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔙 Kanallar ro'yxatiga qaytish", callback_data="adm_sub")]
+            [InlineKeyboardButton(text="🔙 Kanallar ro'yxatiga qaytish", callback_data="adm_groups")]
         ]),
         parse_mode="HTML"
     )
